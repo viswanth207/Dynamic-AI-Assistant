@@ -184,7 +184,7 @@ async function sendMessage(event) {
     chatInput.value = '';
     chatInput.style.height = 'auto';
     
-    addMessageToChat('assistant', '... Thinking ...');
+    const thinkingMsg = addThinkingMessage();
     
     const thinkingStartTime = Date.now();
     
@@ -214,20 +214,16 @@ async function sendMessage(event) {
             await new Promise(resolve => setTimeout(resolve, minThinkingTime - thinkingDuration));
         }
         
-        const chatMessages = document.getElementById('chat-messages');
-        const lastMessage = chatMessages.lastElementChild;
-        if (lastMessage && lastMessage.textContent.includes('... Thinking ...')) {
-            lastMessage.remove();
+        if (thinkingMsg && thinkingMsg.parentNode) {
+            thinkingMsg.remove();
         }
         
         addMessageToChat('assistant', result.assistant_response, result.sources_used);
         
     } catch (error) {
         console.error('Error sending message:', error);
-        const chatMessages = document.getElementById('chat-messages');
-        const lastMessage = chatMessages.lastElementChild;
-        if (lastMessage && lastMessage.textContent.includes('... Thinking ...')) {
-            lastMessage.remove();
+        if (thinkingMsg && thinkingMsg.parentNode) {
+            thinkingMsg.remove();
         }
         addMessageToChat('assistant', `Sorry, I encountered an error: ${error.message}`);
     } finally {
@@ -272,7 +268,7 @@ function addMessageToChat(sender, text, sourcesUsed = null) {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-function addThinkingIndicator() {
+function addThinkingMessage() {
     const chatMessages = document.getElementById('chat-messages');
     
     const welcomeMessage = chatMessages.querySelector('.welcome-message');
@@ -281,9 +277,8 @@ function addThinkingIndicator() {
     }
     
     const thinkingDiv = document.createElement('div');
-    thinkingDiv.className = 'message assistant-message';
+    thinkingDiv.className = 'message assistant-message thinking-message';
     thinkingDiv.id = 'thinking-indicator';
-    thinkingDiv.style.opacity = '1';
     
     const avatar = document.createElement('div');
     avatar.className = 'message-avatar';
@@ -294,7 +289,7 @@ function addThinkingIndicator() {
     
     const text = document.createElement('div');
     text.className = 'message-text';
-    text.innerHTML = '<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span> Thinking...';
+    text.innerHTML = '<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>';
     
     content.appendChild(text);
     thinkingDiv.appendChild(avatar);
@@ -303,7 +298,6 @@ function addThinkingIndicator() {
     chatMessages.appendChild(thinkingDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
     
-    console.log('Thinking indicator appended:', thinkingDiv);
     return thinkingDiv;
 }
 
