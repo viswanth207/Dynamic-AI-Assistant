@@ -185,6 +185,7 @@ async function sendMessage(event) {
     chatInput.style.height = 'auto';
     
     const thinkingMessage = addThinkingIndicator();
+    console.log('Thinking indicator added:', thinkingMessage);
     const thinkingStartTime = Date.now();
     
     try {
@@ -214,6 +215,7 @@ async function sendMessage(event) {
             await new Promise(resolve => setTimeout(resolve, minThinkingTime - thinkingDuration));
         }
         
+        console.log('Removing thinking indicator after', Date.now() - thinkingStartTime, 'ms');
         removeThinkingIndicator(thinkingMessage);
         addMessageToChat('assistant', result.assistant_response, result.sources_used);
         
@@ -265,6 +267,12 @@ function addMessageToChat(sender, text, sourcesUsed = null) {
 
 function addThinkingIndicator() {
     const chatMessages = document.getElementById('chat-messages');
+    
+    const welcomeMessage = chatMessages.querySelector('.welcome-message');
+    if (welcomeMessage) {
+        welcomeMessage.remove();
+    }
+    
     const thinkingDiv = document.createElement('div');
     thinkingDiv.className = 'message assistant-message thinking-message';
     thinkingDiv.id = 'thinking-indicator';
@@ -284,6 +292,7 @@ function addThinkingIndicator() {
     chatMessages.appendChild(thinkingDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
     
+    console.log('Thinking indicator appended to chat');
     return thinkingDiv;
 }
 
