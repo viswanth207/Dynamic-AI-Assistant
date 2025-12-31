@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-    <!-- Navigation Bar -->
     <nav class="navbar">
         <div class="nav-container">
             <div class="nav-logo">
@@ -27,7 +26,6 @@
         </div>
     </nav>
 
-    <!-- Landing Page -->
     <div id="landing-page" class="page active">
         <div class="container">
             <div class="hero">
@@ -43,7 +41,6 @@
                 </button>
             </div>
 
-            <!-- Stats Section -->
             <div class="stats" id="features">
                 <div class="stat-item">
                     <div class="stat-number">∞</div>
@@ -79,7 +76,6 @@
         </div>
     </div>
 
-    <!-- Create Assistant Form -->
     <div id="create-form-page" class="page">
         <div class="container">
             <button class="btn btn-secondary btn-back" onclick="showLanding()">
@@ -90,7 +86,6 @@
                 <h2 class="form-title">Create Your Assistant</h2>
                 
                 <form id="assistant-form" onsubmit="createAssistant(event)">
-                    <!-- Assistant Name -->
                     <div class="form-group">
                         <label for="assistant-name">Assistant Name *</label>
                         <input 
@@ -103,7 +98,6 @@
                         >
                     </div>
 
-                    <!-- Data Source Type -->
                     <div class="form-group">
                         <label>Data Source Type *</label>
                         <div class="radio-group">
@@ -138,7 +132,6 @@
                         </div>
                     </div>
 
-                    <!-- File Upload -->
                     <div class="form-group" id="file-upload-group">
                         <label for="file-upload">Upload File *</label>
                         <div class="file-upload-wrapper">
@@ -155,7 +148,6 @@
                         <small class="form-hint">Maximum file size: 10MB</small>
                     </div>
 
-                    <!-- URL Input -->
                     <div class="form-group hidden" id="url-input-group">
                         <label for="data-url">Website URL *</label>
                         <input 
@@ -167,7 +159,6 @@
                         <small class="form-hint">Enter any website URL (e.g., blog, documentation, article) or API endpoint returning JSON/CSV</small>
                     </div>
 
-                    <!-- Custom Instructions -->
                     <div class="form-group">
                         <label for="custom-instructions">Custom Instructions</label>
                         <textarea 
@@ -179,7 +170,6 @@
                         <small class="form-hint">Define how your assistant should behave</small>
                     </div>
 
-                    <!-- Optional Features -->
                     <div class="form-group">
                         <label>Optional Features</label>
                         <div class="checkbox-group">
@@ -210,30 +200,25 @@
                         </div>
                     </div>
 
-                    <!-- Submit Button -->
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary btn-large" id="submit-btn">
                             Create Assistant
                         </button>
                     </div>
 
-                    <!-- Loading State -->
                     <div id="loading-state" class="loading-state hidden">
                         <div class="spinner"></div>
                         <p>Creating your assistant...</p>
                     </div>
 
-                    <!-- Error Message -->
                     <div id="error-message" class="error-message hidden"></div>
                 </form>
             </div>
         </div>
     </div>
 
-    <!-- Chat Interface -->
     <div id="chat-page" class="page">
         <div class="chat-container">
-            <!-- Chat Header -->
             <div class="chat-header">
                 <div class="chat-header-info">
                     <h3 id="chat-assistant-name">Assistant</h3>
@@ -249,7 +234,6 @@
                 </div>
             </div>
 
-            <!-- Chat Messages -->
             <div id="chat-messages" class="chat-messages">
                 <div class="welcome-message">
                     <div class="welcome-icon">🤖</div>
@@ -258,7 +242,6 @@
                 </div>
             </div>
 
-            <!-- Chat Input -->
             <div class="chat-input-container">
                 <form id="chat-form" onsubmit="sendMessage(event)">
                     <div class="chat-input-wrapper">

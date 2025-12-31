@@ -1,9 +1,3 @@
-"""
-Assistant Engine Module
-Core RAG engine that powers dynamic AI assistants
-Uses Groq LLM with LangChain for retrieval-augmented generation
-"""
-
 from typing import List, Optional, Dict, Any
 from langchain_core.documents import Document
 from langchain_groq import ChatGroq
@@ -18,28 +12,16 @@ logger = logging.getLogger(__name__)
 
 
 class AssistantEngine:
-    """
-    Generic RAG engine for creating and managing AI assistants
-    Each assistant is isolated with its own vector store and configuration
-    """
     
     def __init__(self, groq_api_key: str, model_name: str = "llama-3.3-70b-versatile"):
-        """
-        Initialize the assistant engine
-        
-        Args:
-            groq_api_key: Groq API key
-            model_name: Groq model to use
-        """
         self.groq_api_key = groq_api_key
         self.model_name = model_name
         self.vector_store_manager = VectorStoreManager()
         
-        # Initialize Groq LLM
         self.llm = ChatGroq(
             api_key=groq_api_key,
             model=model_name,
-            temperature=0.3,  # Lower temperature for more factual responses
+            temperature=0.3,
             max_tokens=2048
         )
         
@@ -55,21 +37,6 @@ class AssistantEngine:
         enable_alerts: bool = False,
         enable_recommendations: bool = False
     ) -> Dict[str, Any]:
-        """
-        Create a new assistant with its own vector store
-        
-        Args:
-            assistant_id: Unique identifier for the assistant
-            name: Assistant name
-            documents: List of documents to index
-            custom_instructions: System prompt/instructions
-            enable_statistics: Whether to enable statistical analysis
-            enable_alerts: Whether to enable alert detection
-            enable_recommendations: Whether to enable recommendations
-            
-        Returns:
-            Assistant configuration dictionary
-        """
         try:
             logger.info(f"Creating assistant '{name}' with {len(documents)} documents")
             
@@ -109,26 +76,14 @@ class AssistantEngine:
         assistant_config: Dict[str, Any],
         user_message: str
     ) -> Dict[str, Any]:
-        """
-        Chat with an assistant using RAG
-        
-        Args:
-            assistant_config: Assistant configuration
-            user_message: User's message
-            
-        Returns:
-            Dictionary with response and metadata
-        """
         try:
             vector_store = assistant_config["vector_store"]
             system_instructions = assistant_config["system_instructions"]
             
             logger.info(f"Processing chat for assistant: {assistant_config['name']}")
             
-            # Retrieve relevant documents
-            # For comparison/superlative queries, get many more documents to ensure coverage
             is_comparison = any(word in user_message.lower() for word in ['highest', 'lowest', 'best', 'worst', 'maximum', 'minimum', 'most', 'least', 'compare', 'all', 'which'])
-            k_docs = 30 if is_comparison else 8  # Get many more documents for comparison queries
+            k_docs = 30 if is_comparison else 8
             
             relevant_docs = self.vector_store_manager.similarity_search(
                 vector_store=vector_store,
@@ -143,16 +98,12 @@ class AssistantEngine:
                     "timestamp": datetime.utcnow().isoformat()
                 }
             
-            # Log retrieved document count for debugging
             logger.info(f"Retrieved {len(relevant_docs)} documents for query: {user_message[:50]}...")
             
-            # Build context from retrieved documents
             context = self._build_context(relevant_docs)
             
-            # Build the prompt (pass documents for type detection)
             prompt = self._build_prompt(system_instructions, context, user_message, relevant_docs)
             
-            # Generate response using Groq
             response = self.llm.invoke(prompt)
             
             result = {
@@ -182,7 +133,6 @@ class AssistantEngine:
         enable_alerts: bool,
         enable_recommendations: bool
     ) -> str:
-        """Build complete system instructions based on configuration"""
         
         instructions = [custom_instructions]
         
@@ -225,13 +175,12 @@ class AssistantEngine:
         return "\n".join(instructions)
     
     def _build_context(self, documents: List[Document]) -> str:
-        """Build context string from retrieved documents"""
         context_parts = []
         
         for idx, doc in enumerate(documents, 1):
             context_parts.append(f"[Source {idx}]")
             context_parts.append(doc.page_content)
-            context_parts.append("")  # Empty line for separation
+            context_parts.append("")
         
         return "\n".join(context_parts)
     
@@ -242,15 +191,12 @@ class AssistantEngine:
         user_message: str,
         documents: List[Document] = None
     ) -> str:
-        """Build the complete prompt for the LLM"""
         
-        # Determine data source type from documents
         is_structured_data = False
         is_website_data = False
         
         if documents:
-            # Check metadata to determine source type
-            for doc in documents[:3]:  # Check first few docs
+            for doc in documents[:3]:
                 doc_type = doc.metadata.get('type', '')
                 if doc_type in ['website_content', 'website_section', 'website_paragraph']:
                     is_website_data = True
@@ -259,14 +205,11 @@ class AssistantEngine:
                     is_structured_data = True
                     break
         
-        # Build appropriate instructions based on data type
         if is_website_data:
-            # Instructions for unstructured website/text content
             answering_instructions = """Answer the user's question directly and naturally.
 Write in clear paragraphs as if you're a knowledgeable expert explaining the topic.
 Focus on providing useful information without meta-commentary."""
         elif is_structured_data:
-            # Instructions for structured CSV/JSON data with comparisons
             answering_instructions = """CRITICAL: For comparison queries (highest, lowest, best, worst, etc.):
 1. Examine EVERY source systematically
 2. Compare all values for the metric
@@ -275,7 +218,6 @@ Focus on providing useful information without meta-commentary."""
 For other queries: Provide clear, direct answers based on the data.
 If asked practical questions beyond the data, offer helpful advice."""
         else:
-            # Default instructions
             answering_instructions = """Examine the sources carefully and provide a clear, direct answer.
 Be helpful and informative."""
         
@@ -296,7 +238,6 @@ Be helpful and informative."""
         return prompt
     
     def get_assistant_stats(self, assistant_config: Dict[str, Any]) -> Dict[str, Any]:
-        """Get statistics about an assistant"""
         return {
             "assistant_id": assistant_config["assistant_id"],
             "name": assistant_config["name"],

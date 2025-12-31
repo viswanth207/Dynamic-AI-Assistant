@@ -1,9 +1,3 @@
-"""
-Data Loader Module
-Handles loading data from CSV, JSON, and URLs dynamically
-Converts data into LangChain Document objects for RAG
-"""
-
 import pandas as pd
 import json
 import requests
@@ -17,32 +11,20 @@ logger = logging.getLogger(__name__)
 
 
 class DataLoader:
-    """Dynamic data loader supporting multiple formats"""
     
     @staticmethod
     def load_from_csv(file_path: str) -> List[Document]:
-        """
-        Load data from CSV file and convert to LangChain Documents
-        
-        Args:
-            file_path: Path to CSV file
-            
-        Returns:
-            List of Document objects
-        """
         try:
             df = pd.read_csv(file_path)
             documents = []
             
             for idx, row in df.iterrows():
-                # Combine all columns into a single text content
                 content_parts = []
                 metadata = {"source": file_path, "row_number": idx}
                 
                 for column, value in row.items():
-                    if pd.notna(value):  # Skip NaN values
+                    if pd.notna(value):
                         content_parts.append(f"{column}: {value}")
-                        # Store original values in metadata
                         metadata[column] = str(value)
                 
                 content = " | ".join(content_parts)
@@ -62,23 +44,12 @@ class DataLoader:
     
     @staticmethod
     def load_from_json(file_path: str) -> List[Document]:
-        """
-        Load data from JSON file and convert to LangChain Documents
-        Supports both array of objects and nested structures
-        
-        Args:
-            file_path: Path to JSON file
-            
-        Returns:
-            List of Document objects
-        """
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
             documents = []
             
-            # Handle array of objects
             if isinstance(data, list):
                 for idx, item in enumerate(data):
                     content = DataLoader._dict_to_content(item)
@@ -92,7 +63,6 @@ class DataLoader:
                     )
                     documents.append(doc)
             
-            # Handle single object
             elif isinstance(data, dict):
                 content = DataLoader._dict_to_content(data)
                 doc = Document(
@@ -116,16 +86,6 @@ class DataLoader:
     
     @staticmethod
     def load_from_url(url: str) -> List[Document]:
-        """
-        Fetch data from URL and convert to LangChain Documents
-        Supports JSON, CSV, and regular website HTML content
-        
-        Args:
-            url: URL to fetch data from
-            
-        Returns:
-            List of Document objects
-        """
         try:
             response = requests.get(url, timeout=30, headers={
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -134,7 +94,6 @@ class DataLoader:
             
             content_type = response.headers.get('content-type', '').lower()
             
-            # Try JSON first
             if 'json' in content_type or url.endswith('.json'):
                 try:
                     data = response.json()
@@ -163,9 +122,8 @@ class DataLoader:
                     logger.info(f"Loaded {len(documents)} documents from URL (JSON)")
                     return documents
                 except json.JSONDecodeError:
-                    pass  # Not JSON, try other formats
+                    pass
             
-            # Try CSV
             if 'csv' in content_type or url.endswith('.csv'):
                 from io import StringIO
                 df = pd.read_csv(StringIO(response.text))
@@ -187,15 +145,12 @@ class DataLoader:
                 logger.info(f"Loaded {len(documents)} documents from URL (CSV)")
                 return documents
             
-            # Default: Treat as HTML/text website
             logger.info(f"Processing URL as HTML website: {url}")
             soup = BeautifulSoup(response.content, 'html.parser')
             
-            # Remove unwanted elements
             for element in soup(["script", "style", "noscript", "iframe"]):
                 element.decompose()
             
-            # Get page title
             title = soup.title.string if soup.title else urlparse(url).path
             
             # Extract main content
@@ -256,12 +211,10 @@ class DataLoader:
                         documents.append(doc)
                         chunk_number += 1
                 
-                # Strategy 2: Standalone paragraphs not already captured
                 for p in main_content.find_all('p'):
                     text = p.get_text(strip=True)
                     normalized_text = ' '.join(text.split())
                     
-                    # Keep substantial paragraphs that weren't already added
                     if normalized_text and len(normalized_text) > 50 and normalized_text not in seen_texts:
                         doc = Document(
                             page_content=text,
@@ -280,10 +233,8 @@ class DataLoader:
                     logger.info(f"Loaded {len(documents)} documents from website: {url}")
                     return documents
                 else:
-                    # Provide more helpful error messages for different scenarios
                     domain = urlparse(url).netloc.lower()
                     
-                    # Check for known dynamic sites
                     if any(site in domain for site in ['youtube.com', 'facebook.com', 'twitter.com', 'instagram.com', 'tiktok.com']):
                         raise ValueError(
                             f"Cannot scrape {domain} - this site loads content dynamically with JavaScript. "
@@ -315,7 +266,6 @@ class DataLoader:
     
     @staticmethod
     def _dict_to_content(data: Dict[str, Any], prefix: str = "") -> str:
-        """Convert dictionary to readable content string"""
         parts = []
         for key, value in data.items():
             full_key = f"{prefix}.{key}" if prefix else key
@@ -331,7 +281,6 @@ class DataLoader:
     
     @staticmethod
     def _flatten_dict(data: Dict[str, Any], prefix: str = "") -> Dict[str, str]:
-        """Flatten nested dictionary for metadata"""
         result = {}
         for key, value in data.items():
             full_key = f"{prefix}.{key}" if prefix else key

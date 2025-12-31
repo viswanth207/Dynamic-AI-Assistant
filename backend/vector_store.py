@@ -1,9 +1,3 @@
-"""
-Vector Store Module
-Handles FAISS vector store creation and similarity search
-Provides isolated vector stores for each assistant
-"""
-
 from typing import List, Optional
 from langchain_core.documents import Document
 from langchain_community.vectorstores import FAISS
@@ -15,15 +9,12 @@ logger = logging.getLogger(__name__)
 
 
 class VectorStoreManager:
-    """Manages FAISS vector stores for assistants"""
     
     def __init__(self):
-        """Initialize with HuggingFace embeddings (free, no API key needed)"""
         logger.info("Initializing HuggingFace embeddings...")
         
-        # Using a lightweight but effective embedding model
         self.embeddings = HuggingFaceEmbeddings(
-            model_name="all-MiniLM-L6-v2",  # Fast and effective
+            model_name="all-MiniLM-L6-v2",
             model_kwargs={'device': 'cpu'},
             encode_kwargs={'normalize_embeddings': True}
         )
@@ -31,22 +22,12 @@ class VectorStoreManager:
         logger.info("Embeddings initialized successfully")
     
     def create_vector_store(self, documents: List[Document]) -> FAISS:
-        """
-        Create a FAISS vector store from documents
-        
-        Args:
-            documents: List of LangChain Document objects
-            
-        Returns:
-            FAISS vector store instance
-        """
         if not documents:
             raise ValueError("Cannot create vector store with empty documents")
         
         try:
             logger.info(f"Creating vector store with {len(documents)} documents")
             
-            # Create FAISS vector store
             vector_store = FAISS.from_documents(
                 documents=documents,
                 embedding=self.embeddings
@@ -65,17 +46,6 @@ class VectorStoreManager:
         query: str, 
         k: int = 4
     ) -> List[Document]:
-        """
-        Perform similarity search on vector store
-        
-        Args:
-            vector_store: FAISS vector store to search
-            query: Search query
-            k: Number of results to return
-            
-        Returns:
-            List of most relevant documents
-        """
         try:
             logger.info(f"Performing similarity search for: {query[:50]}...")
             
@@ -97,17 +67,6 @@ class VectorStoreManager:
         query: str, 
         k: int = 4
     ) -> List[tuple[Document, float]]:
-        """
-        Perform similarity search with relevance scores
-        
-        Args:
-            vector_store: FAISS vector store to search
-            query: Search query
-            k: Number of results to return
-            
-        Returns:
-            List of tuples (document, score)
-        """
         try:
             logger.info(f"Performing similarity search with scores for: {query[:50]}...")
             
@@ -124,13 +83,6 @@ class VectorStoreManager:
             return []
     
     def save_vector_store(self, vector_store: FAISS, path: str) -> None:
-        """
-        Save vector store to disk (optional for persistence)
-        
-        Args:
-            vector_store: FAISS vector store to save
-            path: Directory path to save to
-        """
         try:
             os.makedirs(path, exist_ok=True)
             vector_store.save_local(path)
@@ -140,15 +92,6 @@ class VectorStoreManager:
             raise
     
     def load_vector_store(self, path: str) -> FAISS:
-        """
-        Load vector store from disk (optional for persistence)
-        
-        Args:
-            path: Directory path to load from
-            
-        Returns:
-            Loaded FAISS vector store
-        """
         try:
             vector_store = FAISS.load_local(
                 path, 

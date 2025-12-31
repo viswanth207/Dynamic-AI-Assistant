@@ -1,28 +1,18 @@
-/**
- * Frontend JavaScript for Dynamic AI Assistant Platform
- * Handles navigation, form submission, and chat functionality
- */
-
-// Global state
 let currentAssistantId = null;
 let currentAssistantName = null;
 
-// API Base URL (adjust if needed)
 const API_BASE_URL = window.location.origin;
 
-// Initialize
 document.addEventListener('DOMContentLoaded', () => {
     initializeFileUpload();
     initializeChatInput();
 });
 
-// Mobile Menu Toggle
 function toggleMobileMenu() {
     const navLinks = document.querySelector('.nav-links');
     navLinks.classList.toggle('active');
 }
 
-// Close mobile menu when clicking a link
 document.addEventListener('click', (e) => {
     const navLinks = document.querySelector('.nav-links');
     const navToggle = document.querySelector('.nav-toggle');
@@ -36,7 +26,6 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// Page Navigation
 function showLanding() {
     document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
     document.getElementById('landing-page').classList.add('active');
@@ -59,7 +48,6 @@ function showChat(assistantId, assistantName) {
     
     document.getElementById('chat-assistant-name').textContent = assistantName;
     
-    // Clear previous messages except welcome
     const chatMessages = document.getElementById('chat-messages');
     chatMessages.innerHTML = `
         <div class="welcome-message">
@@ -72,7 +60,6 @@ function showChat(assistantId, assistantName) {
     document.getElementById('chat-input').focus();
 }
 
-// Data Source UI Updates
 function updateDataSourceUI() {
     const selectedType = document.querySelector('input[name="data_source_type"]:checked').value;
     const fileUploadGroup = document.getElementById('file-upload-group');
@@ -91,7 +78,6 @@ function updateDataSourceUI() {
         fileInput.setAttribute('required', 'required');
         urlInput.removeAttribute('required');
         
-        // Update accepted file types
         if (selectedType === 'csv') {
             fileInput.setAttribute('accept', '.csv');
         } else if (selectedType === 'json') {
@@ -100,7 +86,6 @@ function updateDataSourceUI() {
     }
 }
 
-// File Upload Handler
 function initializeFileUpload() {
     const fileInput = document.getElementById('file-upload');
     const fileNameDisplay = document.getElementById('file-name');
@@ -115,7 +100,6 @@ function initializeFileUpload() {
     });
 }
 
-// Reset Form
 function resetForm() {
     document.getElementById('assistant-form').reset();
     document.getElementById('file-name').textContent = 'Choose a file...';
@@ -125,7 +109,6 @@ function resetForm() {
     updateDataSourceUI();
 }
 
-// Create Assistant
 async function createAssistant(event) {
     event.preventDefault();
     
@@ -134,21 +117,17 @@ async function createAssistant(event) {
     const loadingState = document.getElementById('loading-state');
     const errorMessage = document.getElementById('error-message');
     
-    // Show loading state
     submitBtn.disabled = true;
     loadingState.classList.remove('hidden');
     errorMessage.classList.add('hidden');
     
     try {
-        // Prepare form data
         const formData = new FormData(form);
         
-        // Convert checkbox values to boolean
         formData.set('enable_statistics', formData.get('enable_statistics') === 'true');
         formData.set('enable_alerts', formData.get('enable_alerts') === 'true');
         formData.set('enable_recommendations', formData.get('enable_recommendations') === 'true');
         
-        // Send request
         const response = await fetch(`${API_BASE_URL}/api/assistants/create`, {
             method: 'POST',
             body: formData
@@ -161,7 +140,6 @@ async function createAssistant(event) {
         
         const result = await response.json();
         
-        // Success! Show chat interface
         showChat(result.assistant_id, result.name);
         
     } catch (error) {
@@ -173,7 +151,6 @@ async function createAssistant(event) {
     }
 }
 
-// Chat Input Auto-resize
 function initializeChatInput() {
     const chatInput = document.getElementById('chat-input');
     
@@ -182,7 +159,6 @@ function initializeChatInput() {
         chatInput.style.height = Math.min(chatInput.scrollHeight, 150) + 'px';
     });
     
-    // Allow Enter to send, Shift+Enter for new line
     chatInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -191,7 +167,6 @@ function initializeChatInput() {
     });
 }
 
-// Send Message
 async function sendMessage(event) {
     event.preventDefault();
     
@@ -201,19 +176,15 @@ async function sendMessage(event) {
     
     if (!message || !currentAssistantId) return;
     
-    // Disable input
     chatInput.disabled = true;
     sendBtn.disabled = true;
     
-    // Add user message to chat
     addMessageToChat('user', message);
     
-    // Clear input
     chatInput.value = '';
     chatInput.style.height = 'auto';
     
     try {
-        // Send request
         const response = await fetch(`${API_BASE_URL}/api/chat`, {
             method: 'POST',
             headers: {
@@ -232,26 +203,22 @@ async function sendMessage(event) {
         
         const result = await response.json();
         
-        // Add assistant response to chat
         addMessageToChat('assistant', result.assistant_response, result.sources_used);
         
     } catch (error) {
         console.error('Error sending message:', error);
         addMessageToChat('assistant', `Sorry, I encountered an error: ${error.message}`);
     } finally {
-        // Re-enable input
         chatInput.disabled = false;
         sendBtn.disabled = false;
         chatInput.focus();
     }
 }
 
-// Add Message to Chat
 function addMessageToChat(sender, text, sourcesUsed = null) {
     const chatMessages = document.getElementById('chat-messages');
     const welcomeMessage = chatMessages.querySelector('.welcome-message');
     
-    // Remove welcome message if it exists
     if (welcomeMessage) {
         welcomeMessage.remove();
     }
@@ -280,18 +247,15 @@ function addMessageToChat(sender, text, sourcesUsed = null) {
     
     chatMessages.appendChild(messageDiv);
     
-    // Scroll to bottom
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// Utility: Escape HTML
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML.replace(/\n/g, '<br>');
 }
 
-// Utility: Format Date
 function formatDate(isoString) {
     const date = new Date(isoString);
     return date.toLocaleString('en-US', {
@@ -303,7 +267,6 @@ function formatDate(isoString) {
     });
 }
 
-// Error Handler
 window.addEventListener('unhandledrejection', (event) => {
     console.error('Unhandled promise rejection:', event.reason);
 });
