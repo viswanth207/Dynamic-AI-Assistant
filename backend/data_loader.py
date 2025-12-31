@@ -1,0 +1,346 @@
+"""
+Data Loader Module
+Handles loading data from CSV, JSON, and URLs dynamically
+Converts data into LangChain Document objects for RAG
+"""
+
+import pandas as pd
+import json
+import requests
+from typing import List, Dict, Any
+from langchain_core.documents import Document
+import logging
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse
+
+logger = logging.getLogger(__name__)
+
+
+class DataLoader:
+    """Dynamic data loader supporting multiple formats"""
+    
+    @staticmethod
+    def load_from_csv(file_path: str) -> List[Document]:
+        """
+        Load data from CSV file and convert to LangChain Documents
+        
+        Args:
+            file_path: Path to CSV file
+            
+        Returns:
+            List of Document objects
+        """
+        try:
+            df = pd.read_csv(file_path)
+            documents = []
+            
+            for idx, row in df.iterrows():
+                # Combine all columns into a single text content
+                content_parts = []
+                metadata = {"source": file_path, "row_number": idx}
+                
+                for column, value in row.items():
+                    if pd.notna(value):  # Skip NaN values
+                        content_parts.append(f"{column}: {value}")
+                        # Store original values in metadata
+                        metadata[column] = str(value)
+                
+                content = " | ".join(content_parts)
+                
+                doc = Document(
+                    page_content=content,
+                    metadata=metadata
+                )
+                documents.append(doc)
+            
+            logger.info(f"Loaded {len(documents)} documents from CSV")
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Error loading CSV: {str(e)}")
+            raise ValueError(f"Failed to load CSV file: {str(e)}")
+    
+    @staticmethod
+    def load_from_json(file_path: str) -> List[Document]:
+        """
+        Load data from JSON file and convert to LangChain Documents
+        Supports both array of objects and nested structures
+        
+        Args:
+            file_path: Path to JSON file
+            
+        Returns:
+            List of Document objects
+        """
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            documents = []
+            
+            # Handle array of objects
+            if isinstance(data, list):
+                for idx, item in enumerate(data):
+                    content = DataLoader._dict_to_content(item)
+                    doc = Document(
+                        page_content=content,
+                        metadata={
+                            "source": file_path,
+                            "item_number": idx,
+                            **DataLoader._flatten_dict(item)
+                        }
+                    )
+                    documents.append(doc)
+            
+            # Handle single object
+            elif isinstance(data, dict):
+                content = DataLoader._dict_to_content(data)
+                doc = Document(
+                    page_content=content,
+                    metadata={
+                        "source": file_path,
+                        **DataLoader._flatten_dict(data)
+                    }
+                )
+                documents.append(doc)
+            
+            else:
+                raise ValueError("JSON must be either an array or object")
+            
+            logger.info(f"Loaded {len(documents)} documents from JSON")
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Error loading JSON: {str(e)}")
+            raise ValueError(f"Failed to load JSON file: {str(e)}")
+    
+    @staticmethod
+    def load_from_url(url: str) -> List[Document]:
+        """
+        Fetch data from URL and convert to LangChain Documents
+        Supports JSON, CSV, and regular website HTML content
+        
+        Args:
+            url: URL to fetch data from
+            
+        Returns:
+            List of Document objects
+        """
+        try:
+            response = requests.get(url, timeout=30, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            })
+            response.raise_for_status()
+            
+            content_type = response.headers.get('content-type', '').lower()
+            
+            # Try JSON first
+            if 'json' in content_type or url.endswith('.json'):
+                try:
+                    data = response.json()
+                    documents = []
+                    
+                    if isinstance(data, list):
+                        for idx, item in enumerate(data):
+                            content = DataLoader._dict_to_content(item)
+                            doc = Document(
+                                page_content=content,
+                                metadata={
+                                    "source": url,
+                                    "item_number": idx,
+                                    **DataLoader._flatten_dict(item)
+                                }
+                            )
+                            documents.append(doc)
+                    elif isinstance(data, dict):
+                        content = DataLoader._dict_to_content(data)
+                        doc = Document(
+                            page_content=content,
+                            metadata={"source": url, **DataLoader._flatten_dict(data)}
+                        )
+                        documents.append(doc)
+                    
+                    logger.info(f"Loaded {len(documents)} documents from URL (JSON)")
+                    return documents
+                except json.JSONDecodeError:
+                    pass  # Not JSON, try other formats
+            
+            # Try CSV
+            if 'csv' in content_type or url.endswith('.csv'):
+                from io import StringIO
+                df = pd.read_csv(StringIO(response.text))
+                documents = []
+                
+                for idx, row in df.iterrows():
+                    content_parts = []
+                    metadata = {"source": url, "row_number": idx}
+                    
+                    for column, value in row.items():
+                        if pd.notna(value):
+                            content_parts.append(f"{column}: {value}")
+                            metadata[column] = str(value)
+                    
+                    content = " | ".join(content_parts)
+                    doc = Document(page_content=content, metadata=metadata)
+                    documents.append(doc)
+                
+                logger.info(f"Loaded {len(documents)} documents from URL (CSV)")
+                return documents
+            
+            # Default: Treat as HTML/text website
+            logger.info(f"Processing URL as HTML website: {url}")
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Remove unwanted elements
+            for element in soup(["script", "style", "noscript", "iframe"]):
+                element.decompose()
+            
+            # Get page title
+            title = soup.title.string if soup.title else urlparse(url).path
+            
+            # Extract main content
+            main_content = soup.find('main') or soup.find('article') or soup.find('div', class_='content') or soup.body
+            
+            if main_content:
+                documents = []
+                seen_texts = set()  # Avoid duplicates
+                chunk_number = 0
+                
+                # Strategy 1: Extract sections with headings
+                for heading in main_content.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
+                    heading_text = heading.get_text(strip=True)
+                    
+                    # Skip very short headings but keep most
+                    if not heading_text or len(heading_text) < 3:
+                        continue
+                    
+                    # Normalize text to check duplicates
+                    normalized_heading = ' '.join(heading_text.split())
+                    if normalized_heading in seen_texts:
+                        continue
+                    
+                    section_content = [heading_text]
+                    seen_texts.add(normalized_heading)
+                    
+                    # Collect content until next heading (within reasonable limit)
+                    content_count = 0
+                    for sibling in heading.find_next_siblings():
+                        if content_count >= 10:  # Limit to avoid too much content per section
+                            break
+                        if sibling.name and sibling.name.startswith('h'):  # Any heading
+                            break
+                        
+                        if sibling.name in ['p', 'div', 'li', 'ul', 'ol', 'span']:
+                            text = sibling.get_text(separator=' ', strip=True)
+                            normalized_text = ' '.join(text.split())
+                            
+                            # Reduced minimum length to capture short descriptions like "Founder & CEO"
+                            if normalized_text and len(normalized_text) > 5 and normalized_text not in seen_texts:
+                                section_content.append(text)
+                                seen_texts.add(normalized_text)
+                                content_count += 1
+                    
+                    # Create document if there's content beyond just the heading (relaxed threshold)
+                    full_content = '\n\n'.join(section_content)
+                    if len(section_content) > 1 or len(full_content) > 20:
+                        doc = Document(
+                            page_content=full_content,
+                            metadata={
+                                "source": url,
+                                "title": title,
+                                "chunk": chunk_number,
+                                "type": "website_section",
+                                "heading": heading_text[:100]  # Truncate long headings in metadata
+                            }
+                        )
+                        documents.append(doc)
+                        chunk_number += 1
+                
+                # Strategy 2: Standalone paragraphs not already captured
+                for p in main_content.find_all('p'):
+                    text = p.get_text(strip=True)
+                    normalized_text = ' '.join(text.split())
+                    
+                    # Keep substantial paragraphs that weren't already added
+                    if normalized_text and len(normalized_text) > 50 and normalized_text not in seen_texts:
+                        doc = Document(
+                            page_content=text,
+                            metadata={
+                                "source": url,
+                                "title": title,
+                                "chunk": chunk_number,
+                                "type": "website_paragraph"
+                            }
+                        )
+                        documents.append(doc)
+                        seen_texts.add(normalized_text)
+                        chunk_number += 1
+                
+                if documents:
+                    logger.info(f"Loaded {len(documents)} documents from website: {url}")
+                    return documents
+                else:
+                    # Provide more helpful error messages for different scenarios
+                    domain = urlparse(url).netloc.lower()
+                    
+                    # Check for known dynamic sites
+                    if any(site in domain for site in ['youtube.com', 'facebook.com', 'twitter.com', 'instagram.com', 'tiktok.com']):
+                        raise ValueError(
+                            f"Cannot scrape {domain} - this site loads content dynamically with JavaScript. "
+                            f"Web scraping works best with:\n"
+                            f"- Blog posts and articles\n"
+                            f"- Documentation sites\n"
+                            f"- Company websites\n"
+                            f"- News sites\n\n"
+                            f"For {domain}, consider using their official API or providing structured data (CSV/JSON) instead."
+                        )
+                    else:
+                        raise ValueError(
+                            "Could not extract meaningful content from the website. "
+                            "This may be because:\n"
+                            "- The page loads content with JavaScript (try a different page)\n"
+                            "- The page has no readable text content\n"
+                            "- The content is behind a login/paywall\n\n"
+                            "Try using a blog post, article, or documentation page instead."
+                        )
+            else:
+                raise ValueError("Could not find main content in the webpage")
+            
+        except requests.RequestException as e:
+            logger.error(f"Error fetching URL: {str(e)}")
+            raise ValueError(f"Failed to fetch data from URL: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error processing URL data: {str(e)}")
+            raise ValueError(f"Failed to process URL data: {str(e)}")
+    
+    @staticmethod
+    def _dict_to_content(data: Dict[str, Any], prefix: str = "") -> str:
+        """Convert dictionary to readable content string"""
+        parts = []
+        for key, value in data.items():
+            full_key = f"{prefix}.{key}" if prefix else key
+            
+            if isinstance(value, dict):
+                parts.append(DataLoader._dict_to_content(value, full_key))
+            elif isinstance(value, list):
+                parts.append(f"{full_key}: {', '.join(map(str, value))}")
+            else:
+                parts.append(f"{full_key}: {value}")
+        
+        return " | ".join(parts)
+    
+    @staticmethod
+    def _flatten_dict(data: Dict[str, Any], prefix: str = "") -> Dict[str, str]:
+        """Flatten nested dictionary for metadata"""
+        result = {}
+        for key, value in data.items():
+            full_key = f"{prefix}.{key}" if prefix else key
+            
+            if isinstance(value, dict):
+                result.update(DataLoader._flatten_dict(value, full_key))
+            elif isinstance(value, (list, tuple)):
+                result[full_key] = str(value)
+            else:
+                result[full_key] = str(value)
+        
+        return result
