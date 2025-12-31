@@ -137,18 +137,18 @@ class AssistantEngine:
         instructions = [custom_instructions]
         
         instructions.append(
-            "\nCRITICAL RESPONSE FORMAT:\n"
+            "\nCRITICAL RESPONSE RULES:\n"
+            "- You MUST ONLY answer questions based on the provided context/data\n"
+            "- If the question is NOT related to the provided data, respond: 'I can only answer questions about the information provided in this dataset. Your question is outside my knowledge base.'\n"
+            "- NEVER use general knowledge or external information\n"
+            "- If the data doesn't contain the answer, say: 'I don't have information about that in the provided data.'\n"
+            "\nRESPONSE FORMAT:\n"
             "- Write like a knowledgeable expert, NOT like someone analyzing documents\n"
             "- ABSOLUTELY NO mentions of 'Source 1', 'Source 2', 'the context', 'I examined', 'I found', etc.\n"
             "- State facts directly in smooth paragraphs\n"
             "- Example WRONG: 'According to Source 3, the CEO is John'\n"
             "- Example RIGHT: 'The CEO is John'\n"
-            "- Be direct, concise, and natural\n"
-            "\nHELPFULNESS RULES:\n"
-            "- If asked a related practical question, provide helpful general advice\n"
-            "- You can use your general knowledge to assist with related topics\n"
-            "- Don't say 'Sorry, only ask questions about the data' - be helpful!\n"
-            "- If the data is relevant, mention it naturally; if not, still provide useful guidance"
+            "- Be direct, concise, and natural"
         )
         
         if enable_statistics:
