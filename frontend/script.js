@@ -184,8 +184,8 @@ async function sendMessage(event) {
     chatInput.value = '';
     chatInput.style.height = 'auto';
     
-    const thinkingMessage = addThinkingIndicator();
-    console.log('Thinking indicator added:', thinkingMessage);
+    addMessageToChat('assistant', '... Thinking ...');
+    
     const thinkingStartTime = Date.now();
     
     try {
@@ -202,7 +202,6 @@ async function sendMessage(event) {
         
         if (!response.ok) {
             const error = await response.json();
-            removeThinkingIndicator(thinkingMessage);
             throw new Error(error.detail || error.error || 'Failed to get response');
         }
         
@@ -215,13 +214,21 @@ async function sendMessage(event) {
             await new Promise(resolve => setTimeout(resolve, minThinkingTime - thinkingDuration));
         }
         
-        console.log('Removing thinking indicator after', Date.now() - thinkingStartTime, 'ms');
-        removeThinkingIndicator(thinkingMessage);
+        const chatMessages = document.getElementById('chat-messages');
+        const lastMessage = chatMessages.lastElementChild;
+        if (lastMessage && lastMessage.textContent.includes('... Thinking ...')) {
+            lastMessage.remove();
+        }
+        
         addMessageToChat('assistant', result.assistant_response, result.sources_used);
         
     } catch (error) {
         console.error('Error sending message:', error);
-        removeThinkingIndicator(thinkingMessage);
+        const chatMessages = document.getElementById('chat-messages');
+        const lastMessage = chatMessages.lastElementChild;
+        if (lastMessage && lastMessage.textContent.includes('... Thinking ...')) {
+            lastMessage.remove();
+        }
         addMessageToChat('assistant', `Sorry, I encountered an error: ${error.message}`);
     } finally {
         chatInput.disabled = false;
