@@ -185,6 +185,7 @@ async function sendMessage(event) {
     chatInput.style.height = 'auto';
     
     const thinkingMessage = addThinkingIndicator();
+    const thinkingStartTime = Date.now();
     
     try {
         const response = await fetch(`${API_BASE_URL}/api/chat`, {
@@ -198,15 +199,22 @@ async function sendMessage(event) {
             })
         });
         
-        removeThinkingIndicator(thinkingMessage);
-        
         if (!response.ok) {
             const error = await response.json();
+            removeThinkingIndicator(thinkingMessage);
             throw new Error(error.detail || error.error || 'Failed to get response');
         }
         
         const result = await response.json();
         
+        const thinkingDuration = Date.now() - thinkingStartTime;
+        const minThinkingTime = 800;
+        
+        if (thinkingDuration < minThinkingTime) {
+            await new Promise(resolve => setTimeout(resolve, minThinkingTime - thinkingDuration));
+        }
+        
+        removeThinkingIndicator(thinkingMessage);
         addMessageToChat('assistant', result.assistant_response, result.sources_used);
         
     } catch (error) {
