@@ -274,25 +274,29 @@ function addThinkingIndicator() {
     }
     
     const thinkingDiv = document.createElement('div');
-    thinkingDiv.className = 'message assistant-message thinking-message';
+    thinkingDiv.className = 'message assistant-message';
     thinkingDiv.id = 'thinking-indicator';
+    thinkingDiv.style.opacity = '1';
     
-    thinkingDiv.innerHTML = `
-        <div class="message-avatar">🤖</div>
-        <div class="message-content">
-            <div class="message-text">
-                <span class="thinking-dots">
-                    <span>.</span><span>.</span><span>.</span>
-                </span>
-                Thinking
-            </div>
-        </div>
-    `;
+    const avatar = document.createElement('div');
+    avatar.className = 'message-avatar';
+    avatar.textContent = '🤖';
+    
+    const content = document.createElement('div');
+    content.className = 'message-content';
+    
+    const text = document.createElement('div');
+    text.className = 'message-text';
+    text.innerHTML = '<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span> Thinking...';
+    
+    content.appendChild(text);
+    thinkingDiv.appendChild(avatar);
+    thinkingDiv.appendChild(content);
     
     chatMessages.appendChild(thinkingDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
     
-    console.log('Thinking indicator appended to chat');
+    console.log('Thinking indicator appended:', thinkingDiv);
     return thinkingDiv;
 }
 
