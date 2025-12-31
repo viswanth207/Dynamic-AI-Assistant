@@ -184,6 +184,8 @@ async function sendMessage(event) {
     chatInput.value = '';
     chatInput.style.height = 'auto';
     
+    const thinkingMessage = addThinkingIndicator();
+    
     try {
         const response = await fetch(`${API_BASE_URL}/api/chat`, {
             method: 'POST',
@@ -196,6 +198,8 @@ async function sendMessage(event) {
             })
         });
         
+        removeThinkingIndicator(thinkingMessage);
+        
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.detail || error.error || 'Failed to get response');
@@ -207,6 +211,7 @@ async function sendMessage(event) {
         
     } catch (error) {
         console.error('Error sending message:', error);
+        removeThinkingIndicator(thinkingMessage);
         addMessageToChat('assistant', `Sorry, I encountered an error: ${error.message}`);
     } finally {
         chatInput.disabled = false;
@@ -248,6 +253,36 @@ function addMessageToChat(sender, text, sourcesUsed = null) {
     chatMessages.appendChild(messageDiv);
     
     chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function addThinkingIndicator() {
+    const chatMessages = document.getElementById('chat-messages');
+    const thinkingDiv = document.createElement('div');
+    thinkingDiv.className = 'message assistant-message thinking-message';
+    thinkingDiv.id = 'thinking-indicator';
+    
+    thinkingDiv.innerHTML = `
+        <div class="message-avatar">🤖</div>
+        <div class="message-content">
+            <div class="message-text">
+                <span class="thinking-dots">
+                    <span>.</span><span>.</span><span>.</span>
+                </span>
+                Thinking
+            </div>
+        </div>
+    `;
+    
+    chatMessages.appendChild(thinkingDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    
+    return thinkingDiv;
+}
+
+function removeThinkingIndicator(thinkingMessage) {
+    if (thinkingMessage && thinkingMessage.parentNode) {
+        thinkingMessage.remove();
+    }
 }
 
 function escapeHtml(text) {
