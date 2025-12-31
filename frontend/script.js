@@ -1,11 +1,19 @@
 let currentAssistantId = null;
 let currentAssistantName = null;
+let currentConversationId = null;
 
 const API_BASE_URL = window.location.origin;
+const CONVERSATIONS_KEY = 'ai_assistant_conversations';
 
 document.addEventListener('DOMContentLoaded', () => {
     initializeFileUpload();
     initializeChatInput();
+    loadConversationList();
+    
+    document.getElementById('home-link')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        showLanding();
+    });
 });
 
 function toggleMobileMenu() {
@@ -48,15 +56,17 @@ function showChat(assistantId, assistantName) {
     
     document.getElementById('chat-assistant-name').textContent = assistantName;
     
-    const chatMessages = document.getElementById('chat-messages');
-    chatMessages.innerHTML = `
-        <div class="welcome-message">
-            <div class="welcome-icon">🤖</div>
-            <h3>Welcome to ${assistantName}!</h3>
-            <p>Your assistant is ready. Ask me anything about your data!</p>
-        </div>
-    `;
+    const conversations = getAllConversations();
+    const assistantConversations = Object.values(conversations).filter(conv => conv.assistantId === assistantId);
     
+    if (assistantConversations.length > 0) {
+        const mostRecent = assistantConversations.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0];
+        switchConversation(mostRecent.id);
+    } else {
+        startNewConversation();
+    }
+    
+    loadConversationList();
     document.getElementById('chat-input').focus();
 }
 
@@ -176,10 +186,15 @@ async function sendMessage(event) {
     
     if (!message || !currentAssistantId) return;
     
+    if (!currentConversationId) {
+        startNewConversation();
+    }
+    
     chatInput.disabled = true;
     sendBtn.disabled = true;
     
     addMessageToChat('user', message);
+    saveMessageToConversation('user', message);
     
     chatInput.value = '';
     chatInput.style.height = 'auto';
@@ -219,13 +234,16 @@ async function sendMessage(event) {
         }
         
         addMessageToChat('assistant', result.assistant_response, result.sources_used);
+        saveMessageToConversation('assistant', result.assistant_response);
         
     } catch (error) {
         console.error('Error sending message:', error);
         if (thinkingMsg && thinkingMsg.parentNode) {
             thinkingMsg.remove();
         }
-        addMessageToChat('assistant', `Sorry, I encountered an error: ${error.message}`);
+        const errorMsg = `Sorry, I encountered an error: ${error.message}`;
+        addMessageToChat('assistant', errorMsg);
+        saveMessageToConversation('assistant', errorMsg);
     } finally {
         chatInput.disabled = false;
         sendBtn.disabled = false;
@@ -327,3 +345,163 @@ function formatDate(isoString) {
 window.addEventListener('unhandledrejection', (event) => {
     console.error('Unhandled promise rejection:', event.reason);
 });
+
+function generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+function getAllConversations() {
+    const stored = localStorage.getItem(CONVERSATIONS_KEY);
+    return stored ? JSON.parse(stored) : {};
+}
+
+function saveConversation(conversationId, conversationData) {
+    const conversations = getAllConversations();
+    conversations[conversationId] = conversationData;
+    localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(conversations));
+}
+
+function getConversation(conversationId) {
+    const conversations = getAllConversations();
+    return conversations[conversationId] || null;
+}
+
+function deleteConversationById(conversationId) {
+    const conversations = getAllConversations();
+    delete conversations[conversationId];
+    localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(conversations));
+}
+
+function startNewConversation() {
+    currentConversationId = generateUUID();
+    
+    const conversationData = {
+        id: currentConversationId,
+        assistantId: currentAssistantId,
+        assistantName: currentAssistantName,
+        messages: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        title: 'New Chat'
+    };
+    
+    saveConversation(currentConversationId, conversationData);
+    
+    const chatMessages = document.getElementById('chat-messages');
+    chatMessages.innerHTML = '';
+    addMessageToChat('assistant', `Hello! I'm ${currentAssistantName}. How can I help you today?`);
+    
+    loadConversationList();
+}
+
+function loadConversationList() {
+    const conversationList = document.getElementById('conversation-list');
+    if (!conversationList) return;
+    
+    const conversations = getAllConversations();
+    const conversationArray = Object.values(conversations)
+        .filter(conv => conv.assistantId === currentAssistantId)
+        .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+    
+    conversationList.innerHTML = '';
+    
+    conversationArray.forEach(conversation => {
+        const item = document.createElement('div');
+        item.className = 'conversation-item';
+        if (conversation.id === currentConversationId) {
+            item.classList.add('active');
+        }
+        
+        item.innerHTML = `
+            <span class="conversation-title">${escapeHtml(conversation.title)}</span>
+            <button class="conversation-delete" onclick="deleteConversation('${conversation.id}', event)">×</button>
+        `;
+        
+        item.onclick = (e) => {
+            if (!e.target.classList.contains('conversation-delete')) {
+                switchConversation(conversation.id);
+            }
+        };
+        
+        conversationList.appendChild(item);
+    });
+}
+
+function switchConversation(conversationId) {
+    const conversation = getConversation(conversationId);
+    if (!conversation) return;
+    
+    currentConversationId = conversationId;
+    
+    const chatMessages = document.getElementById('chat-messages');
+    chatMessages.innerHTML = '';
+    
+    conversation.messages.forEach(msg => {
+        addMessageToChat(msg.role, msg.content);
+    });
+    
+    loadConversationList();
+}
+
+function deleteConversation(conversationId, event) {
+    event.stopPropagation();
+    
+    if (!confirm('Delete this conversation?')) return;
+    
+    deleteConversationById(conversationId);
+    
+    if (conversationId === currentConversationId) {
+        startNewConversation();
+    } else {
+        loadConversationList();
+    }
+}
+
+function toggleSidebar() {
+    const sidebar = document.getElementById('chat-sidebar');
+    sidebar.classList.toggle('hidden');
+}
+
+function updateConversationTitle(conversationId, firstUserMessage) {
+    const conversation = getConversation(conversationId);
+    if (!conversation) return;
+    
+    const title = firstUserMessage.length > 30 
+        ? firstUserMessage.substring(0, 30) + '...' 
+        : firstUserMessage;
+    
+    conversation.title = title;
+    saveConversation(conversationId, conversation);
+    loadConversationList();
+}
+
+function saveMessageToConversation(role, content) {
+    if (!currentConversationId) {
+        startNewConversation();
+    }
+    
+    const conversation = getConversation(currentConversationId);
+    if (!conversation) return;
+    
+    const userMessagesBefore = conversation.messages.filter(m => m.role === 'user').length;
+    
+    conversation.messages.push({ role, content, timestamp: new Date().toISOString() });
+    conversation.updatedAt = new Date().toISOString();
+    
+    if (role === 'user' && userMessagesBefore === 0) {
+        const title = content.length > 30 
+            ? content.substring(0, 30) + '...' 
+            : content;
+        conversation.title = title;
+    }
+    
+    saveConversation(currentConversationId, conversation);
+    
+    if (role === 'user' && userMessagesBefore === 0) {
+        loadConversationList();
+    }
+}
