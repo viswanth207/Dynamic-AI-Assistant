@@ -208,7 +208,7 @@ async function sendMessage(event) {
         const result = await response.json();
         
         const thinkingDuration = Date.now() - thinkingStartTime;
-        const minThinkingTime = 800;
+        const minThinkingTime = 2000;
         
         if (thinkingDuration < minThinkingTime) {
             await new Promise(resolve => setTimeout(resolve, minThinkingTime - thinkingDuration));
